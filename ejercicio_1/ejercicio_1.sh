@@ -1,6 +1,8 @@
 #!/bin/bash
 
 usuarios="usuarios.txt"
+usuario_logueado=""
+esta_corriendo=true
 
 if [ ! -f "$usuarios" ]; then
     echo "admin:admin" > "$usuarios"
@@ -33,58 +35,74 @@ crear_usuario() {
 
 cambiar_contrasena() {
     echo "-- Cambiar contraseña --"
-    read -p "Ingrese su nombre de usuario: " usuario
-
-    if ! grep -q "^${usuario}:" "$usuarios"; then
-        echo "El usuario '$usuario' no existe."
-        return
-    fi
-
-    pass_actual=$(grep "^${usuario}:" "$usuarios" | cut -d':' -f2)
-    read -s -p "Ingrese su contraseña actual: " pass_ingresada
-    echo
-    if [ "$pass_actual" != "$pass_ingresada" ]; then
-        echo "Contraseña incorrecta."
-        return
-    fi
     read -s -p "Ingrese nueva contraseña: " nueva_pass
     echo
     if [ -z "$nueva_pass" ]; then
         echo "La contraseña no puede estar vacía."
         return
     fi
-    sed -i "s/^${usuario}:${pass_actual}$/${usuario}:${nueva_pass}/" "$usuarios"
+    sed -i "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios"
+    echo "Contraseña actualizada correctamente para '$usuario_logueado'."
+}
 
-    echo "✅ Contraseña actualizada correctamente para '$usuario'."
+login() {
+    echo "-- Login --"
+    read -p "Ingrese nombre de usuario: " usuario
+    if ! grep -q "^${usuario}:" "$usuarios"; then
+        echo "El usuario '$usuario' no existe."
+        return
+    fi
+    pass_guardada=$(grep "^${usuario}:" "$usuarios" | cut -d':' -f2)
+    read -s -p "Ingrese contraseña: " pass_ingresada
+    echo
+    if [ "$pass_guardada" = "$pass_ingresada" ]; then
+        usuario_logueado="$usuario"
+        echo "Bienvenido, $usuario_logueado."
+    else
+        echo "Contraseña incorrecta."
+    fi
+}
+
+logout() {
+    usuario="$usuario_logueado"
+    usuario_logueado=""
+    echo "Sesión cerrada de '$usuario'."
 }
 
 mostrarMenu() {
     echo "====================================="
     echo "   SISTEMA DE CONTROL DE INVENTARIO"
+    echo "   Usuario: $usuario_logueado"
     echo "====================================="
     echo "1) Crear usuario"
     echo "2) Cambiar contraseña"
-    echo "3) Login"
-    echo "4) Logout"
-    echo "5) Ingresar producto"
-    echo "6) Vender producto"
-    echo "7) Filtrar productos"
-    echo "8) Crear reporte de pinturas"
-    echo "9) Salir"
+    echo "3) Logout"
+    echo "4) Ingresar producto"
+    echo "5) Vender producto"
+    echo "6) Filtrar productos"
+    echo "7) Crear reporte de pinturas"
+    echo "8) Salir"
     echo "====================================="
 }
 
-while true; do
-    mostrarMenu
-    read -p "Seleccione una opción: " opcion
+while $esta_corriendo; do
+    while [ -z "$usuario_logueado" ]; do
+        login
+    done
 
-    case "$opcion" in
-        1) crear_usuario ;;
-        2) cambiar_contrasena ;;
-        9) echo "Saliendo..."; exit 0 ;;
-        *) echo "Opción no válida." ;;
-    esac
+    while $esta_corriendo; do
+        mostrarMenu
+        read -p "Seleccione una opción: " opcion
 
-    echo ""
+        case "$opcion" in
+            1) crear_usuario ;;
+            2) cambiar_contrasena ;;
+            3) logout 
+                break
+                ;;
+            8) echo "Saliendo..."; esta_corriendo=false ;;
+            *) echo "Opción no válida." ;;
+        esac
+        echo ""
+    done
 done
-
