@@ -26,3 +26,19 @@ verifico que no sea vacia
 sed significa Stream EDitor.
 -i viene de in-place (modificar el archivo directamente)
 s/patrón_a_buscar/texto_de_reemplazo/
+
+
+====== INGRESAR PRODUCTOS ========
+```
+if ! [[ "$cantidad" =~ ^[0-9]+$ ]]; then
+```
+=~ para comparar una cadena con una expresión regular
+el + es por una o más repeticiones
+$para que sean digitos hasta el final
+
+```
+codigo=$(echo "$tipo" | awk '{print toupper(substr($0,1,3))}')
+```
+awk sirve para recorrer archivos o cadenas y operar sobre líneas, columnas o texto.
+substr($0,1,3) toma los primeros 3 caracteres de la línea.
+toupper(...) los convierte a mayúsculas.
