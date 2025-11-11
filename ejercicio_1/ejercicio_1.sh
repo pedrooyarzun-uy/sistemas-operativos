@@ -1,11 +1,15 @@
 #!/bin/bash
 
 usuarios="usuarios.txt"
+productos="productos.txt"
 usuario_logueado=""
 esta_corriendo=true
 
 if [ ! -f "$usuarios" ]; then
     echo "admin:admin" > "$usuarios"
+fi
+if [ ! -f "$productos" ]; then
+    > "$productos"
 fi
 
 crear_usuario() {
@@ -69,6 +73,39 @@ logout() {
     echo "Sesión cerrada de '$usuario'."
 }
 
+ingresar_producto() {
+    echo "-- Ingresar producto --"
+    read -p "Tipo: " tipo
+    if [ -z "$tipo" ]; then
+        echo "El tipo no puede estar vacío."
+        return
+    fi
+    read -p "Modelo: " modelo
+    if [ -z "$modelo" ]; then
+        echo "El modelo no puede estar vacío."
+        return
+    fi
+    read -p "Descripción: " descripcion
+    if [ -z "$descripcion" ]; then
+        echo "La descripción no puede estar vacía."
+        return
+    fi
+    read -p "Cantidad: " cantidad
+    if ! [[ "$cantidad" =~ ^[0-9]+$ ]]; then
+        echo "La cantidad debe ser un entero no negativo."
+        return
+    fi
+    read -p "Precio unitario (entero): " precio
+    if ! [[ "$precio" =~ ^[0-9]+$ ]]; then
+        echo "El precio debe ser un entero no negativo."
+        return
+    fi
+    codigo=$(echo "$tipo" | awk '{print toupper(substr($0,1,3))}')
+    linea="${codigo} - ${tipo} - ${modelo} - ${descripcion} - ${cantidad} - \$ ${precio}"
+    echo "$linea" >> "$productos"
+    echo "Producto ingresado: $linea"
+}
+
 mostrarMenu() {
     echo "====================================="
     echo "   SISTEMA DE CONTROL DE INVENTARIO"
@@ -100,6 +137,7 @@ while $esta_corriendo; do
             3) logout 
                 break
                 ;;
+            4) ingresar_producto ;;
             8) echo "Saliendo..."; esta_corriendo=false ;;
             *) echo "Opción no válida." ;;
         esac
