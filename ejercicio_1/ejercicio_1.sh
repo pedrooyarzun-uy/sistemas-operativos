@@ -45,7 +45,7 @@ cambiar_contrasena() {
         echo "La contraseña no puede estar vacía."
         return
     fi
-    sed -i "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios"
+    sed -i '' "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios"
     echo "Contraseña actualizada correctamente para '$usuario_logueado'."
 }
 
