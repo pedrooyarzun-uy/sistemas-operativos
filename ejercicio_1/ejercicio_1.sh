@@ -106,6 +106,86 @@ ingresar_producto() {
     echo "Producto ingresado: $linea"
 }
 
+vender_producto() {
+    echo "-- Vender producto --"
+    if [ ! -s "$productos" ]; then
+        echo "No hay productos cargados."
+        return
+    fi
+    mapfile -t lista_productos < "$productos"
+    if [ "${#lista_productos[@]}" -eq 0 ]; then
+        echo "No hay productos cargados."
+        return
+    fi
+
+    declare -a codigos tipos modelos descripciones cantidades precios lineas_actualizadas
+    for idx in "${!lista_productos[@]}"; do
+        linea="${lista_productos[$idx]}"
+        IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto <<< "$linea"
+        precio="${resto#\$ }"
+        codigos[idx]="$codigo"
+        tipos[idx]="$tipo"
+        modelos[idx]="$modelo"
+        descripciones[idx]="$descripcion"
+        cantidades[idx]="$cantidad"
+        precios[idx]="$precio"
+        lineas_actualizadas[idx]="$linea"
+    done
+
+    echo "Productos disponibles:"
+    for idx in "${!lista_productos[@]}"; do
+        numero=$((idx + 1))
+        printf "%d) %s - %s - $%s (Stock: %s)\n" "$numero" "${tipos[idx]}" "${modelos[idx]}" "${precios[idx]}" "${cantidades[idx]}"
+    done
+
+    declare -A carrito
+    while true; do
+        read -p "Número de producto (Enter para finalizar): " numero
+        if [ -z "$numero" ]; then
+            break
+        fi
+        if ! [[ "$numero" =~ ^[0-9]+$ ]] || [ "$numero" -lt 1 ] || [ "$numero" -gt "${#lista_productos[@]}" ]; then
+            echo "Número inválido."
+            continue
+        fi
+        idx=$((numero - 1))
+        stock_disponible=$((cantidades[idx] - ${carrito[$idx]:-0}))
+        if [ "$stock_disponible" -le 0 ]; then
+            echo "No hay stock disponible para ${tipos[idx]} - ${modelos[idx]}."
+            continue
+        fi
+        read -p "Cantidad a comprar (máximo $stock_disponible): " cantidad_compra
+        if ! [[ "$cantidad_compra" =~ ^[0-9]+$ ]] || [ "$cantidad_compra" -le 0 ]; then
+            echo "La cantidad debe ser un entero positivo."
+            continue
+        fi
+        if [ "$cantidad_compra" -gt "$stock_disponible" ]; then
+            echo "No puede superar el stock disponible."
+            continue
+        fi
+        carrito[$idx]=$(( ${carrito[$idx]:-0} + cantidad_compra ))
+        echo "Agregado: ${tipos[idx]} - ${modelos[idx]} x $cantidad_compra."
+    done
+
+    if [ "${#carrito[@]}" -eq 0 ]; then
+        echo "No se seleccionó ningún producto."
+        return
+    fi
+
+    total_general=0
+    echo "Resumen de compra:"
+    for idx in "${!carrito[@]}"; do
+        cantidad_vendida=${carrito[$idx]}
+        subtotal=$((cantidad_vendida * precios[idx]))
+        total_general=$((total_general + subtotal))
+        printf "- %s - %s | Cantidad: %d | Total: $%d\n" "${tipos[idx]}" "${modelos[idx]}" "$cantidad_vendida" "$subtotal"
+        nueva_cantidad=$((cantidades[idx] - cantidad_vendida))
+        lineas_actualizadas[idx]="${codigos[idx]} - ${tipos[idx]} - ${modelos[idx]} - ${descripciones[idx]} - ${nueva_cantidad} - \$ ${precios[idx]}"
+    done
+    printf "%s\n" "${lineas_actualizadas[@]}" > "$productos"
+    echo "Total general: \$${total_general}"
+}
+
 mostrarMenu() {
     echo "====================================="
     echo "   SISTEMA DE CONTROL DE INVENTARIO"
@@ -138,6 +218,7 @@ while $esta_corriendo; do
                 break
                 ;;
             4) ingresar_producto ;;
+            5) vender_producto ;;
             8) echo "Saliendo..."; esta_corriendo=false ;;
             *) echo "Opción no válida." ;;
         esac
