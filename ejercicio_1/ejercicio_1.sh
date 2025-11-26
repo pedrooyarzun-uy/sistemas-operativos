@@ -112,7 +112,11 @@ vender_producto() {
         echo "No hay productos cargados."
         return
     fi
-    mapfile -t lista_productos < "$productos"
+    lista_productos=()
+    while IFS= read -r linea; do
+        [ -z "$linea" ] && continue
+        lista_productos+=("$linea")
+    done < "$productos"
     if [ "${#lista_productos[@]}" -eq 0 ]; then
         echo "No hay productos cargados."
         return
@@ -138,7 +142,7 @@ vender_producto() {
         printf "%d) %s - %s - $%s (Stock: %s)\n" "$numero" "${tipos[idx]}" "${modelos[idx]}" "${precios[idx]}" "${cantidades[idx]}"
     done
 
-    declare -A carrito
+    carrito=()
     while true; do
         read -p "Número de producto (Enter para finalizar): " numero
         if [ -z "$numero" ]; then
@@ -178,7 +182,7 @@ vender_producto() {
         cantidad_vendida=${carrito[$idx]}
         subtotal=$((cantidad_vendida * precios[idx]))
         total_general=$((total_general + subtotal))
-        printf "- %s - %s | Cantidad: %d | Total: $%d\n" "${tipos[idx]}" "${modelos[idx]}" "$cantidad_vendida" "$subtotal"
+        printf -- "- %s - %s | Cantidad: %d | Total: $%d\n" "${tipos[idx]}" "${modelos[idx]}" "$cantidad_vendida" "$subtotal"
         nueva_cantidad=$((cantidades[idx] - cantidad_vendida))
         lineas_actualizadas[idx]="${codigos[idx]} - ${tipos[idx]} - ${modelos[idx]} - ${descripciones[idx]} - ${nueva_cantidad} - \$ ${precios[idx]}"
     done

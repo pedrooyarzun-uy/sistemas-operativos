@@ -45,11 +45,14 @@ toupper(...) los convierte a mayúsculas.
 
 vender producto
 si el archivo está vacío informamos que no hay stock.
-mapfile -t lee todas las líneas del archivo en un array lista_productos (una por índice).
+```
+while IFS= read -r linea; do ... lista_productos+=("$linea"); done < "$productos"
+```
+con este `while` cargamos cada línea en un array sin depender de `mapfile`, compatible con la versión de Bash 3.2 de macOS.
 IFS=' - ' read -r ... permite separar cada parte del string en variables (codigo, tipo, modelo, descripción, cantidad y precio).
 usamos arreglos para preservar cada columna y poder recalcularlas al final.
 for ... printf lista cada producto con su número (idx + 1), tipo, modelo, precio y stock.
-guardamos la compra en un diccionario (declare -A carrito) donde la clave es el índice del producto y el valor la cantidad pedida.
+guardamos la compra en un array `carrito` donde el índice numérico coincide con el número de producto seleccionado y el valor es la cantidad pedida (compatible con Bash 3.2 sin arreglos asociativos).
 Parámetros de la interacción:
 - Número de producto: se valida que sea entero positivo dentro del rango y permite Enter para terminar la selección.
 - Cantidad a comprar: debe ser entero > 0 y no puede superar el stock aún disponible (stock original menos lo ya agregado al carrito).
