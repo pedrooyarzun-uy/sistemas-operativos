@@ -43,15 +43,15 @@ awk sirve para recorrer archivos o cadenas y operar sobre líneas, columnas o te
 substr($0,1,3) toma los primeros 3 caracteres de la línea.
 toupper(...) los convierte a mayúsculas.
 
-====== REPORTE DE PINTURAS ======
+====== REPORTE CSV ======
 ```
 mkdir -p "$datos_dir"
 ```
 `-p` crea la carpeta Datos en el mismo directorio que el script (sin fallar si ya existe).
 `echo "codigo,..." > "$datos_reporte"` pisa el archivo `Datos/datos.CSV` y escribe la fila de encabezados en formato CSV.
-Volvemos a iterar el archivo con `while IFS=' - ' read -r ...` para recuperar los campos y dejamos solo los productos cuyo tipo contenga la palabra "pintura" (convertido a minúsculas con `tr`).
+Volvemos a iterar el archivo con `while IFS=' - ' read -r ...` para recuperar cada campo y agregar todas las líneas del inventario al CSV.
 ```
 printf "%s,%s,%s,%s,%s,%s\n" ... >> "$datos_reporte"
 ```
 genera cada fila del CSV con código, tipo, modelo, descripción, stock y precio sin el símbolo `$`.
-Si no se encontraron pinturas, el archivo queda solo con el encabezado y se informa por pantalla.
+Si no se encontraron productos (p.ej. archivo vacío), queda solo el encabezado y se aclara en pantalla.

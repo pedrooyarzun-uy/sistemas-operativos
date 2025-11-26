@@ -123,15 +123,12 @@ crear_reporte() {
         [ -z "$linea" ] && continue
         IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto <<< "$linea"
         precio="${resto#\$ }"
-        tipo_normalizado=$(echo "$tipo" | tr '[:upper:]' '[:lower:]')
-        if [[ "$tipo_normalizado" == *"pintura"* ]]; then
-            printf "%s,%s,%s,%s,%s,%s\n" "$codigo" "$tipo" "$modelo" "$descripcion" "$cantidad" "$precio" >> "$datos_reporte"
-            registros=$((registros + 1))
-        fi
+        printf "%s,%s,%s,%s,%s,%s\n" "$codigo" "$tipo" "$modelo" "$descripcion" "$cantidad" "$precio" >> "$datos_reporte"
+        registros=$((registros + 1))
     done < "$productos"
 
     if [ "$registros" -eq 0 ]; then
-        echo "No se encontraron productos del tipo pintura. Se generó el archivo vacío con encabezado."
+        echo "No se encontraron productos para reportar. Se generó el archivo solo con encabezado."
     else
         echo "Reporte generado en '$datos_reporte' con $registros registro(s)."
     fi
