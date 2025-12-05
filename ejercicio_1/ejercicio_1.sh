@@ -45,7 +45,9 @@ cambiar_contrasena() {
         echo "La contraseña no puede estar vacía."
         return
     fi
-    sed -i "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios"
+    tmp=$(mktemp)
+    sed "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios" > "$tmp" \
+      && mv "$tmp" "$usuarios"
     echo "Contraseña actualizada correctamente para '$usuario_logueado'."
 }
 
@@ -75,31 +77,57 @@ logout() {
 
 ingresar_producto() {
     echo "-- Ingresar producto --"
-    read -p "Tipo: " tipo
-    if [ -z "$tipo" ]; then
-        echo "El tipo no puede estar vacío."
-        return
-    fi
-    read -p "Modelo: " modelo
-    if [ -z "$modelo" ]; then
-        echo "El modelo no puede estar vacío."
-        return
-    fi
-    read -p "Descripción: " descripcion
-    if [ -z "$descripcion" ]; then
-        echo "La descripción no puede estar vacía."
-        return
-    fi
-    read -p "Cantidad: " cantidad
-    if ! [[ "$cantidad" =~ ^[0-9]+$ ]]; then
-        echo "La cantidad debe ser un entero no negativo."
-        return
-    fi
-    read -p "Precio unitario (entero): " precio
-    if ! [[ "$precio" =~ ^[0-9]+$ ]]; then
-        echo "El precio debe ser un entero no negativo."
-        return
-    fi
+
+    tipo_valido=false
+    while [ "$tipo_valido" = false ]; do
+        read -p "Tipo: " tipo
+        if [ -z "$tipo" ]; then
+            echo "El tipo no puede estar vacío."
+        else
+            tipo_valido=true
+        fi
+    done
+
+    modelo_valido=false
+    while [ "$modelo_valido" = false ]; do
+        read -p "Modelo: " modelo
+        if [ -z "$modelo" ]; then
+            echo "El modelo no puede estar vacío."
+        else
+            modelo_valido=true
+        fi
+    done
+
+    descripcion_valida=false
+    while [ "$descripcion_valida" = false ]; do
+        read -p "Descripción: " descripcion
+        if [ -z "$descripcion" ]; then
+            echo "La descripción no puede estar vacía."
+        else
+            descripcion_valida=true
+        fi
+    done
+
+    cantidad_valida=false
+    while [ "$cantidad_valida" = false ]; do
+        read -p "Cantidad: " cantidad
+        if ! [[ "$cantidad" =~ ^[0-9]+$ ]]; then
+            echo "La cantidad debe ser un entero no negativo."
+        else
+            cantidad_valida=true
+        fi
+    done
+
+    precio_valido=false
+    while [ "$precio_valido" = false ]; do
+        read -p "Precio unitario (entero): " precio
+        if ! [[ "$precio" =~ ^[0-9]+$ ]]; then
+            echo "El precio debe ser un entero no negativo."
+        else
+            precio_valido=true
+        fi
+    done
+    
     codigo=$(echo "$tipo" | awk '{print toupper(substr($0,1,3))}')
     linea="${codigo} - ${tipo} - ${modelo} - ${descripcion} - ${cantidad} - \$ ${precio}"
     echo "$linea" >> "$productos"
