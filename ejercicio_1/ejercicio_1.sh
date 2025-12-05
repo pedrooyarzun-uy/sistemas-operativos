@@ -45,7 +45,9 @@ cambiar_contrasena() {
         echo "La contraseña no puede estar vacía."
         return
     fi
-    sed -i "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios"
+    tmp=$(mktemp)
+    sed "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios" > "$tmp" \
+      && mv "$tmp" "$usuarios"
     echo "Contraseña actualizada correctamente para '$usuario_logueado'."
 }
 
@@ -75,36 +77,63 @@ logout() {
 
 ingresar_producto() {
     echo "-- Ingresar producto --"
-    read -p "Tipo: " tipo
-    if [ -z "$tipo" ]; then
-        echo "El tipo no puede estar vacío."
-        return
-    fi
-    read -p "Modelo: " modelo
-    if [ -z "$modelo" ]; then
-        echo "El modelo no puede estar vacío."
-        return
-    fi
-    read -p "Descripción: " descripcion
-    if [ -z "$descripcion" ]; then
-        echo "La descripción no puede estar vacía."
-        return
-    fi
-    read -p "Cantidad: " cantidad
-    if ! [[ "$cantidad" =~ ^[0-9]+$ ]]; then
-        echo "La cantidad debe ser un entero no negativo."
-        return
-    fi
-    read -p "Precio unitario (entero): " precio
-    if ! [[ "$precio" =~ ^[0-9]+$ ]]; then
-        echo "El precio debe ser un entero no negativo."
-        return
-    fi
+
+    tipo_valido=false
+    while [ "$tipo_valido" = false ]; do
+        read -p "Tipo: " tipo
+        if [ -z "$tipo" ]; then
+            echo "El tipo no puede estar vacío."
+        else
+            tipo_valido=true
+        fi
+    done
+
+    modelo_valido=false
+    while [ "$modelo_valido" = false ]; do
+        read -p "Modelo: " modelo
+        if [ -z "$modelo" ]; then
+            echo "El modelo no puede estar vacío."
+        else
+            modelo_valido=true
+        fi
+    done
+
+    descripcion_valida=false
+    while [ "$descripcion_valida" = false ]; do
+        read -p "Descripción: " descripcion
+        if [ -z "$descripcion" ]; then
+            echo "La descripción no puede estar vacía."
+        else
+            descripcion_valida=true
+        fi
+    done
+
+    cantidad_valida=false
+    while [ "$cantidad_valida" = false ]; do
+        read -p "Cantidad: " cantidad
+        if ! [[ "$cantidad" =~ ^[0-9]+$ ]]; then
+            echo "La cantidad debe ser un entero no negativo."
+        else
+            cantidad_valida=true
+        fi
+    done
+
+    precio_valido=false
+    while [ "$precio_valido" = false ]; do
+        read -p "Precio unitario (entero): " precio
+        if ! [[ "$precio" =~ ^[0-9]+$ ]]; then
+            echo "El precio debe ser un entero no negativo."
+        else
+            precio_valido=true
+        fi
+    done
+    
     codigo=$(echo "$tipo" | awk '{print toupper(substr($0,1,3))}')
     linea="${codigo} - ${tipo} - ${modelo} - ${descripcion} - ${cantidad} - \$ ${precio}"
     echo "$linea" >> "$productos"
     echo "Producto ingresado: $linea"
 }
+
 
 filtrar_productos() {
     echo "-- Filtrar productos --"
@@ -146,6 +175,91 @@ filtrar_productos() {
     done
 }
 
+
+vender_producto() {
+    echo "-- Vender producto --"
+    if [ ! -s "$productos" ]; then
+        echo "No hay productos cargados."
+        return
+    fi
+    lista_productos=()
+    while IFS= read -r linea; do
+        [ -z "$linea" ] && continue
+        lista_productos+=("$linea")
+    done < "$productos"
+    if [ "${#lista_productos[@]}" -eq 0 ]; then
+        echo "No hay productos cargados."
+        return
+    fi
+
+    declare -a codigos tipos modelos descripciones cantidades precios lineas_actualizadas
+    for idx in "${!lista_productos[@]}"; do
+        linea="${lista_productos[$idx]}"
+        IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto <<< "$linea"
+        precio="${resto#\$ }"
+        codigos[idx]="$codigo"
+        tipos[idx]="$tipo"
+        modelos[idx]="$modelo"
+        descripciones[idx]="$descripcion"
+        cantidades[idx]="$cantidad"
+        precios[idx]="$precio"
+        lineas_actualizadas[idx]="$linea"
+    done
+
+    echo "Productos disponibles:"
+    for idx in "${!lista_productos[@]}"; do
+        numero=$((idx + 1))
+        printf "%d) %s - %s - $%s (Stock: %s)\n" "$numero" "${tipos[idx]}" "${modelos[idx]}" "${precios[idx]}" "${cantidades[idx]}"
+    done
+
+    carrito=()
+    while true; do
+        read -p "Número de producto (Enter para finalizar): " numero
+        if [ -z "$numero" ]; then
+            break
+        fi
+        if ! [[ "$numero" =~ ^[0-9]+$ ]] || [ "$numero" -lt 1 ] || [ "$numero" -gt "${#lista_productos[@]}" ]; then
+            echo "Número inválido."
+            continue
+        fi
+        idx=$((numero - 1))
+        stock_disponible=$((cantidades[idx] - ${carrito[$idx]:-0}))
+        if [ "$stock_disponible" -le 0 ]; then
+            echo "No hay stock disponible para ${tipos[idx]} - ${modelos[idx]}."
+            continue
+        fi
+        read -p "Cantidad a comprar (máximo $stock_disponible): " cantidad_compra
+        if ! [[ "$cantidad_compra" =~ ^[0-9]+$ ]] || [ "$cantidad_compra" -le 0 ]; then
+            echo "La cantidad debe ser un entero positivo."
+            continue
+        fi
+        if [ "$cantidad_compra" -gt "$stock_disponible" ]; then
+            echo "No puede superar el stock disponible."
+            continue
+        fi
+        carrito[$idx]=$(( ${carrito[$idx]:-0} + cantidad_compra ))
+        echo "Agregado: ${tipos[idx]} - ${modelos[idx]} x $cantidad_compra."
+    done
+
+    if [ "${#carrito[@]}" -eq 0 ]; then
+        echo "No se seleccionó ningún producto."
+        return
+    fi
+
+    total_general=0
+    echo "Resumen de compra:"
+    for idx in "${!carrito[@]}"; do
+        cantidad_vendida=${carrito[$idx]}
+        subtotal=$((cantidad_vendida * precios[idx]))
+        total_general=$((total_general + subtotal))
+        printf -- "- %s - %s | Cantidad: %d | Total: $%d\n" "${tipos[idx]}" "${modelos[idx]}" "$cantidad_vendida" "$subtotal"
+        nueva_cantidad=$((cantidades[idx] - cantidad_vendida))
+        lineas_actualizadas[idx]="${codigos[idx]} - ${tipos[idx]} - ${modelos[idx]} - ${descripciones[idx]} - ${nueva_cantidad} - \$ ${precios[idx]}"
+    done
+    printf "%s\n" "${lineas_actualizadas[@]}" > "$productos"
+    echo "Total general: \$${total_general}"
+}
+
 mostrarMenu() {
     echo "====================================="
     echo "   SISTEMA DE CONTROL DE INVENTARIO"
@@ -179,6 +293,7 @@ while $esta_corriendo; do
                 ;;
             4) ingresar_producto ;;
             6) filtrar_productos ;;
+            5) vender_producto ;;
             8) echo "Saliendo..."; esta_corriendo=false ;;
             *) echo "Opción no válida." ;;
         esac

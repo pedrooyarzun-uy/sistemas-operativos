@@ -60,3 +60,19 @@ ajustamos `IFS` para separar cada columna según el formato de guardado y obtene
 `resto#\$ ` elimina el prefijo `$ `, dejando solo el valor del precio.
 Si hay filtro, se compara la versión en minúsculas (`tipo_normalizado`) y se imprime con `printf` cada producto que coincide.
 Cuando no encuentra coincidencias informa si no hay productos o si el tipo especificado no existe.
+
+====== VENDER PRODUCTOS ======
+si el archivo está vacío informamos que no hay stock.
+```
+while IFS= read -r linea; do ... lista_productos+=("$linea"); done < "$productos"
+```
+con este `while` cargamos cada línea en un array sin depender de `mapfile`, compatible con la versión de Bash 3.2 de macOS.
+IFS=' - ' read -r ... permite separar cada parte del string en variables (codigo, tipo, modelo, descripción, cantidad y precio).
+usamos arreglos para preservar cada columna y poder recalcularlas al final.
+for ... printf lista cada producto con su número (idx + 1), tipo, modelo, precio y stock.
+guardamos la compra en un array `carrito` donde el índice numérico coincide con el número de producto seleccionado y el valor es la cantidad pedida (compatible con Bash 3.2 sin arreglos asociativos).
+Parámetros de la interacción:
+- Número de producto: se valida que sea entero positivo dentro del rango y permite Enter para terminar la selección.
+- Cantidad a comprar: debe ser entero > 0 y no puede superar el stock aún disponible (stock original menos lo ya agregado al carrito).
+finalizada la carga, recorremos el carrito para calcular el subtotal (cantidad * precio), mostrar el resumen (tipo – modelo – cantidad – total) y acumular el total general.
+actualizamos el archivo productos.txt reemplazando la cantidad con la nueva cantidad (stock actual menos lo vendido).
