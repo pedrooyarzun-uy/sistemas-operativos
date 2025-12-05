@@ -134,6 +134,48 @@ ingresar_producto() {
     echo "Producto ingresado: $linea"
 }
 
+
+filtrar_productos() {
+    echo "-- Filtrar productos --"
+    if [ ! -s "$productos" ]; then
+        echo "No hay productos cargados."
+        return
+    fi
+
+    pedir_filtro=true
+
+    while [ "$pedir_filtro" = true ]; do
+
+        read -p "Ingrese tipo para filtrar (Enter para todos): " filtro_tipo
+        filtro_normalizado=$(echo "$filtro_tipo" | tr '[:upper:]' '[:lower:]')
+        encontrados=0
+
+        while IFS= read -r linea; do
+            [ -z "$linea" ] && continue
+            IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto <<< "$linea"
+            precio="${resto#\$ }"
+            tipo_normalizado=$(echo "$tipo" | tr '[:upper:]' '[:lower:]')
+            if [ -n "$filtro_tipo" ] && [ "$tipo_normalizado" != "$filtro_normalizado" ]; then
+                continue
+            fi
+            printf "%s - %s - %s - %s - Stock: %s - $%s\n" "$codigo" "$tipo" "$modelo" "$descripcion" "$cantidad" "$precio"
+            encontrados=1
+        done < "$productos"
+
+        if [ "$encontrados" -eq 0 ]; then
+            if [ -z "$filtro_tipo" ]; then
+                echo "No hay productos para mostrar."
+            else
+                echo "No se encontraron productos para el tipo '$filtro_tipo'."
+            fi
+        else
+            pedir_filtro=false
+        fi
+        echo
+    done
+}
+
+
 vender_producto() {
     echo "-- Vender producto --"
     if [ ! -s "$productos" ]; then
@@ -250,6 +292,7 @@ while $esta_corriendo; do
                 break
                 ;;
             4) ingresar_producto ;;
+            6) filtrar_productos ;;
             5) vender_producto ;;
             8) echo "Saliendo..."; esta_corriendo=false ;;
             *) echo "Opción no válida." ;;

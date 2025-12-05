@@ -43,7 +43,25 @@ awk sirve para recorrer archivos o cadenas y operar sobre líneas, columnas o te
 substr($0,1,3) toma los primeros 3 caracteres de la línea.
 toupper(...) los convierte a mayúsculas.
 
-vender producto
+====== FILTRAR PRODUCTOS ======
+```
+if [ ! -s "$productos" ]; then
+```
+-s valida que exista y no esté vacío para evitar recorrer archivos vacíos.
+`read -p "Ingrese tipo para filtrar (Enter para todos): "` permite ingresar el filtro opcional.
+```
+filtro_normalizado=$(echo "$filtro_tipo" | tr '[:upper:]' '[:lower:]')
+```
+con `tr` llevamos el texto a minúsculas y así comparamos sin depender de mayúsculas/minúsculas.
+```
+while IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto
+```
+ajustamos `IFS` para separar cada columna según el formato de guardado y obtener cada campo con `read`.
+`resto#\$ ` elimina el prefijo `$ `, dejando solo el valor del precio.
+Si hay filtro, se compara la versión en minúsculas (`tipo_normalizado`) y se imprime con `printf` cada producto que coincide.
+Cuando no encuentra coincidencias informa si no hay productos o si el tipo especificado no existe.
+
+====== VENDER PRODUCTOS ======
 si el archivo está vacío informamos que no hay stock.
 ```
 while IFS= read -r linea; do ... lista_productos+=("$linea"); done < "$productos"
