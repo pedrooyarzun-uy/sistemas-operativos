@@ -76,3 +76,16 @@ Parámetros de la interacción:
 - Cantidad a comprar: debe ser entero > 0 y no puede superar el stock aún disponible (stock original menos lo ya agregado al carrito).
 finalizada la carga, recorremos el carrito para calcular el subtotal (cantidad * precio), mostrar el resumen (tipo – modelo – cantidad – total) y acumular el total general.
 actualizamos el archivo productos.txt reemplazando la cantidad con la nueva cantidad (stock actual menos lo vendido).
+
+====== REPORTE CSV ======
+```
+mkdir -p "$datos_dir"
+```
+`-p` crea la carpeta Datos en el mismo directorio que el script (sin fallar si ya existe).
+`echo "codigo,..." > "$datos_reporte"` pisa el archivo `Datos/datos.CSV` y escribe la fila de encabezados en formato CSV.
+Volvemos a iterar el archivo con `while IFS=' - ' read -r ...` para recuperar cada campo y agregar todas las líneas del inventario al CSV.
+```
+printf "%s,%s,%s,%s,%s,%s\n" ... >> "$datos_reporte"
+```
+genera cada fila del CSV con código, tipo, modelo, descripción, stock y precio sin el símbolo `$`.
+Si no se encontraron productos (p.ej. archivo vacío), queda solo el encabezado y se aclara en pantalla.

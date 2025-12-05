@@ -2,6 +2,8 @@
 
 usuarios="usuarios.txt"
 productos="productos.txt"
+datos_dir="Datos"
+datos_reporte="$datos_dir/datos.CSV"
 usuario_logueado=""
 esta_corriendo=true
 
@@ -260,6 +262,33 @@ vender_producto() {
     echo "Total general: \$${total_general}"
 }
 
+crear_reporte() {
+    echo "-- Crear reporte de pinturas --"
+    if [ ! -s "$productos" ]; then
+        echo "No hay productos cargados."
+        return
+    fi
+
+    mkdir -p "$datos_dir"
+    echo "codigo,tipo,modelo,descripcion,cantidad,precio" > "$datos_reporte"
+    registros=0
+
+    while IFS= read -r linea; do
+        [ -z "$linea" ] && continue
+        IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto <<< "$linea"
+        precio="${resto#\$ }"
+        printf "%s,%s,%s,%s,%s,%s\n" "$codigo" "$tipo" "$modelo" "$descripcion" "$cantidad" "$precio" >> "$datos_reporte"
+        registros=$((registros + 1))
+    done < "$productos"
+
+    if [ "$registros" -eq 0 ]; then
+        echo "No se encontraron productos para reportar. Se generó el archivo solo con encabezado."
+    else
+        echo "Reporte generado en '$datos_reporte' con $registros registro(s)."
+    fi
+}
+
+
 mostrarMenu() {
     echo "====================================="
     echo "   SISTEMA DE CONTROL DE INVENTARIO"
@@ -294,6 +323,7 @@ while $esta_corriendo; do
             4) ingresar_producto ;;
             6) filtrar_productos ;;
             5) vender_producto ;;
+            7) crear_reporte ;;
             8) echo "Saliendo..."; esta_corriendo=false ;;
             *) echo "Opción no válida." ;;
         esac
