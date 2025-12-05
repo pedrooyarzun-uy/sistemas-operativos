@@ -112,29 +112,38 @@ filtrar_productos() {
         echo "No hay productos cargados."
         return
     fi
-    read -p "Ingrese tipo para filtrar (Enter para todos): " filtro_tipo
-    filtro_normalizado=$(echo "$filtro_tipo" | tr '[:upper:]' '[:lower:]')
-    encontrados=0
 
-    while IFS= read -r linea; do
-        [ -z "$linea" ] && continue
-        IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto <<< "$linea"
-        precio="${resto#\$ }"
-        tipo_normalizado=$(echo "$tipo" | tr '[:upper:]' '[:lower:]')
-        if [ -n "$filtro_tipo" ] && [ "$tipo_normalizado" != "$filtro_normalizado" ]; then
-            continue
-        fi
-        printf "%s - %s - %s - %s - Stock: %s - $%s\n" "$codigo" "$tipo" "$modelo" "$descripcion" "$cantidad" "$precio"
-        encontrados=1
-    done < "$productos"
+    pedir_filtro=true
 
-    if [ "$encontrados" -eq 0 ]; then
-        if [ -z "$filtro_tipo" ]; then
-            echo "No hay productos para mostrar."
+    while [ "$pedir_filtro" = true ]; do
+
+        read -p "Ingrese tipo para filtrar (Enter para todos): " filtro_tipo
+        filtro_normalizado=$(echo "$filtro_tipo" | tr '[:upper:]' '[:lower:]')
+        encontrados=0
+
+        while IFS= read -r linea; do
+            [ -z "$linea" ] && continue
+            IFS=' - ' read -r codigo tipo modelo descripcion cantidad resto <<< "$linea"
+            precio="${resto#\$ }"
+            tipo_normalizado=$(echo "$tipo" | tr '[:upper:]' '[:lower:]')
+            if [ -n "$filtro_tipo" ] && [ "$tipo_normalizado" != "$filtro_normalizado" ]; then
+                continue
+            fi
+            printf "%s - %s - %s - %s - Stock: %s - $%s\n" "$codigo" "$tipo" "$modelo" "$descripcion" "$cantidad" "$precio"
+            encontrados=1
+        done < "$productos"
+
+        if [ "$encontrados" -eq 0 ]; then
+            if [ -z "$filtro_tipo" ]; then
+                echo "No hay productos para mostrar."
+            else
+                echo "No se encontraron productos para el tipo '$filtro_tipo'."
+            fi
         else
-            echo "No se encontraron productos para el tipo '$filtro_tipo'."
+            pedir_filtro=false
         fi
-    fi
+        echo
+    done
 }
 
 mostrarMenu() {
