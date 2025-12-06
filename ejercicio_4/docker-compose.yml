@@ -1,6 +1,7 @@
 services:
   #Servicio de nginx
   nginx:
+    hostname: nginxserver
     build:
       context: .
       dockerfile: Dockerfile.nginx
@@ -14,6 +15,7 @@ services:
 
   # Servicio de la aplicacion web
   web:
+    hostname: webapp
     build: ./web
     image: dockerfile
     depends_on:
@@ -26,6 +28,7 @@ services:
 
   # Servicio de redis
   redis:
+    hostname: redisdb
     image: "redis:alpine"
     volumes:
       - redis_data:/data
