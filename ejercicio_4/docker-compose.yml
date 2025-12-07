@@ -1,0 +1,44 @@
+services:
+  #Servicio de nginx
+  nginx:
+    hostname: nginxserver
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    ports:
+      - "5302:80"
+    depends_on:
+      - web
+    networks:
+      - app-network
+    restart: always
+
+  # Servicio de la aplicacion web
+  web:
+    hostname: webapp
+    build: ./web
+    image: dockerfile
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    deploy:
+      replicas: 3  # Numero de instancias de la aplicacion
+    restart: always
+
+  # Servicio de redis
+  redis:
+    hostname: redisdb
+    image: "redis:alpine"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  redis_data:
