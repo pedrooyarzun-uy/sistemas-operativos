@@ -1,37 +1,34 @@
-Informe Técnico Programa Tambo
-==============================
+Informe Técnico – Programa Main
+================================
 
-Diseño general
---------------
-`tambo.adb` define una única `procedure Tambo`. Dentro del cuerpo se instancian todos los recursos protegidos, el `task type Vaca (Id : Positive)` y un arreglo de 100 accesos a tareas. Cada `Vaca` recibe un parámetro discreto `Id` que se usa en los mensajes y en el orden de creación. Las tareas se asignan con `new Vaca (I)`; este paso arranca inmediatamente cada thread y no requiere parámetros adicionales porque la lógica está encapsulada en el cuerpo del task.
+Contexto general
+----------------
+`main.adb` encapsula todo dentro de la `procedure Main`. Allí se declara un `task type Semaforo` que ofrece las operaciones clásicas `P` y `V` junto con un `entry Inicializar` para fijar la capacidad en tiempo de ejecución. Este patrón recrea exactamente el semáforo contado de Dijkstra: un `select` permite que varias tareas ejecuten `P` mientras `en_el_recurso < cap_maxima`, y `V` siempre está disponible para liberar el cupo. Instancias concretas (`sem_ordenie`, `sem_vacunacion`, `sem_pasillo`, `sem_camiones`) modelan cada recurso físico del tambo.
 
-Generación aleatoria
---------------------
-El paquete `Random_Float` se instancia como `Randomes`, un objeto protegido porque el generador `Random_Float.Generator` no es seguro para concurrencia. La función `Aleatorio` expone un valor `Float` uniforme en [0,1). Estas muestras alimentan tres decisiones:
-- `Primero_Ordene` compara `Aleatorio` con 0.5 para intercalar el orden ordeñe/vacunación sin coordinar con otras vacas.
-- Los `delay Duration (Aleatorio * 3.0)` y `delay Duration (Aleatorio * 2.0)` materializan los tiempos de ordeñe y vacunación respetando los máximos pedidos.
+Generación y comportamiento de tareas
+-------------------------------------
+Se define `task type Vaca` con un único `entry Iniciar (Id)`. Dentro del cuerpo, cada vaca guarda su identificador, inicializa un generador pseudoaleatorio propio (semilla `Id`) y declara procedimientos locales:
 
-Sala de ordeñe
---------------
-`protected Sala_Ordene` modela el semáforo de capacidad 15. El contador `En_Sala` se incrementa al aceptar `Entrar_Ordene` y se decrementa en `Salir_Ordene`. La guarda `when En_Sala < 15` bloquea solicitudes excedentes. Ambos entry reciben el parámetro `Id` únicamente para imprimir las trazas; funcionalmente no se usa para la sincronización.
+- `Espera_Aleatoria (Max_Seg)` transforma un `Float` uniforme en un `delay` dentro de `[0, Max_Seg)`.
+- `Ordeñar` realiza `P` sobre `sem_ordenie` (capacidad 15) antes de entrar, espera hasta 3 segundos y finalmente invoca `V`.
+- `Vacunar` combina `sem_vacunacion` (capacidad 5) con el semáforo binario `sem_pasillo` para modelar el corredor único: primero reserva cupo en la manga, luego alterna `P/V` sobre el pasillo para entrar y salir sin cruces.
+- `Subir_Camion` utiliza `sem_camiones` como mutex alrededor de los contadores `cant_camion1` y `cant_camion2`.
 
-Área de vacunación
-------------------
-`protected Area_Vacunacion` agrupa el estado del pasillo y de las cinco mangas. La entrada `Entrar_Pasillo` expone dos efectos: primero controla el pasillo verificando `Pasillo_Libre`, luego reserva una manga incrementando `Dentro_Mangas`. El parámetro `Token` se devuelve por `out` con el entero `Siguiente_Token`, lo que identifica la posición FIFO de cada vaca dentro de las mangas.  
-`Salir_Manga` toma `Token` por valor para garantizar que solamente la vaca con el turno correcto (`Token = Turno_Salida`) libere el pasillo. Este mecanismo evita que una vaca salga si otra está aún delante de ella y, junto con `Pasillo_Libre`, asegura que nunca haya un cruce simultáneo en el corredor.
+Tras aceptar `Iniciar`, cada tarea decide con probabilidad 0.5 si ordeña antes de vacunarse o al revés. Este intercambio recuerda al problema de los Filósofos Comensales: dos secciones críticas (ordeñe y vacunación) pueden tomarse en distinto orden, pero aquí no hay bloqueo circular porque nunca se poseen ambos recursos a la vez; cada fase se completa y se libera el semáforo antes de avanzar, lo que mantiene el sistema libre de deadlocks a pesar del orden aleatorio.
 
-Camiones
---------
-`protected Camiones` administra los dos cupos de 50. El entry `Subir` se habilita mientras `Carga_1 + Carga_2 < 100`, por lo que las tareas se bloquean si los camiones están llenos. El parámetro de salida `Camion` informa cuál vehículo aceptó a la vaca; la lógica de selección simplemente llena el Camión 1 hasta que llegue a 50 y luego continúa con el Camión 2. No es necesario balancear porque los requerimientos solo exigen respetar la capacidad.
+Correspondencia con problemas conocidos
+---------------------------------------
+- **Semáforos contados (Dijkstra)**: el `task type Semaforo` es una implementación explícita del mecanismo `P/V`. La forma de uso en `Ordeñar` y `Vacunar` coincide con el patrón clásico de los Filósofos, donde cada proceso debe esperar a que haya cubiertos (recursos) disponibles para continuar.
+- **Pasillo de sentido único / Alice & Bob**: `sem_pasillo` impone que solo una vaca transite el corredor al mismo tiempo, análogo al ejemplo académico del “puente de un solo carril” donde Alice y Bob deben coordinarse para no chocar. Aquí cada vaca ejecuta `P` antes de entrar y `V` al salir, garantizando exclusión mutua.
+- **Secciones críticas con cupo limitado**: `sem_ordenie` y `sem_vacunacion` restringen la cantidad simultánea de vacas pero *no* imponen un orden FIFO ni el flujo típico de productor-consumidor; simplemente bloquean cuando el cupo está lleno y liberan al ejecutar `V`. Es una aplicación directa de semáforos contados sin cola explícita.
+- **Problema de asignación a camiones**: `sem_camiones` se usa como mutex alrededor de `cant_camion1` y `cant_camion2`. Las vacas se suben tomando una decisión aleatoria cuando ambos están por debajo de 50 y, si uno ya alcanzó 50, se cargan automáticamente en el otro.
 
-Task Vaca
----------
-Cada cuerpo de `task Vaca` define dos subprogramas locales:
-- `Ir_A_Ordene` llama secuencialmente a `Entrar_Ordene`, espera un delay aleatorio y luego invoca `Salir_Ordene`.
-- `Ir_A_Vacunacion` obtiene un `Token` de `Entrar_Pasillo`, espera el delay de vacunación y libera el pasillo/manga mediante `Salir_Manga`.
+Componentes específicos
+-----------------------
+- **Área de ordeñe**: `sem_ordenie.Inicializar (15)` limita el ingreso simultáneo a quince vacas. No se guarda ningún estado adicional; las trazas se imprimen antes y después del `delay`.
+- **Vacunación y pasillo**: `sem_vacunacion.Inicializar (5)` garantiza que como máximo cinco vacas estén en las mangas. El pasillo (`capacidad = 1`) reproduce un candado binario independiente para evitar cruces al entrar o salir.
+- **Camiones**: `sem_camiones.Inicializar (1)` se usa únicamente como mutex. Las decisiones de asignación se basan en `probabilidad_camion` cuando ambos camiones tienen espacio; si solo queda lugar en uno se direcciona automáticamente.
 
-La decisión `if Primero_Ordene then ...` alterna el orden de invocación de esas operaciones. Finalmente, la vaca llama a `Camiones.Subir`, que bloquea hasta tener espacio en algún camión. No se usa `select` porque los requerimientos no piden cancelaciones ni timeouts; la espera pasiva dentro del entry satisface la sincronización.
-
-Ejecución recomendada
----------------------
-Compilar con `gnatmake tambo.adb` genera el ejecutable `tambo`. Al ejecutarlo, se observarán mensajes generados dentro de cada entry, lo que permite seguir el flujo técnico de adquisición y liberación de recursos, así como la asignación final de camiones. No se realizaron pruebas durante la redacción de este informe.
+Ejecución y pruebas
+-------------------
+La construcción se realiza con `gnatmake main.adb`, lo que genera el ejecutable `main`. Al correrlo, se crearán 100 tareas `vaca` y se observarán impresiones concurrentes de cada etapa.
