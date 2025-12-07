@@ -8,6 +8,18 @@
 
 Creamos un loop infinito para mostrar el menu de opciones. 
 
+### Menú principal y autenticación
+
+Antes de mostrar el menú se obliga a iniciar sesión (por defecto existe `admin:admin`). Una vez logueado se despliegan las siguientes opciones:
+1. Crear usuario
+2. Cambiar contraseña
+3. Logout (volver al prompt de login)
+4. Ingresar producto
+5. Vender producto
+6. Filtrar productos
+7. Crear reporte de pinturas (CSV)
+8. Salir del sistema
+
 crear usuario
 guardamos el archivo usuarios.txt en la variable usuarios.
 si el archivo no existe creamos el usuario admin por default
@@ -103,15 +115,20 @@ Si no se encontraron productos (p.ej. archivo vacío), queda solo el encabezado 
 
 ```
 $ bash ejercicio_1.sh
+-- Login --
+Ingrese nombre de usuario: admin
+Ingrese contraseña: ****
+Bienvenido, admin.
 ===== MENÚ PRINCIPAL =====
 1) Crear usuario
 2) Cambiar contraseña
-3) Ingresar productos
-4) Filtrar productos
-5) Vender productos
-6) Generar reporte CSV
-0) Salir
-Seleccione una opción: 3
+3) Logout
+4) Ingresar producto
+5) Vender producto
+6) Filtrar productos
+7) Crear reporte de pinturas
+8) Salir
+Seleccione una opción: 4
 Ingrese tipo: notebook
 Ingrese modelo: ThinkPad
 Descripción: 14 pulgadas
@@ -127,8 +144,8 @@ Resumen de compra:
 notebook - ThinkPad - 2u - $2400
 Total: $2400
 
-Seleccione una opción: 6
-Reporte generado en Datos/datos.csv
+Seleccione una opción: 7
+Reporte generado en Datos/datos.CSV
 ```
 
 El ejemplo muestra el alta de un producto, una venta y la generación del reporte, cubriendo el flujo mínimo esperado para corregir el ejercicio.
