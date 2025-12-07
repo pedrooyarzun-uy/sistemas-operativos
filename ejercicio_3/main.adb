@@ -1,7 +1,7 @@
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Numerics.Float_Random; use Ada.Numerics.Float_Random;
 
-procedure Tambo is
+procedure Main is
    task type semaforo is
       entry inicializar (capacidad : Integer);
       entry p;
@@ -152,4 +152,4 @@ begin
    end loop;
 
    null;
-end Tambo;
+end Main;
