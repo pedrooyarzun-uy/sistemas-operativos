@@ -6,6 +6,8 @@ datos_dir="Datos"
 datos_reporte="$datos_dir/datos.CSV"
 usuario_logueado=""
 esta_corriendo=true
+tipos_validos=(base layer shade dry contrast technical texture mediums)
+codigos_validos=(BAS LAY SHA DRY CON TEC TEX MED)
 
 if [ ! -f "$usuarios" ]; then
     echo "admin:admin" > "$usuarios"
@@ -16,40 +18,54 @@ fi
 
 crear_usuario() {
     echo "-- Crear usuario --"
-    read -p "Ingrese nombre de usuario: " nuevo_usuario
-    if [ -z "$nuevo_usuario" ]; then
-        echo "El nombre de usuario no puede estar vacío."
-        return
-    fi
-    if [[ "$nuevo_usuario" == *:* ]]; then
-        echo "El nombre de usuario no puede contener ':'"
-        return
-    fi
-    if grep -q "^${nuevo_usuario}:" "$usuarios"; then
-        echo "El usuario '$nuevo_usuario' ya existe."
-        return
-    fi
-    read -s -p "Ingrese contraseña: " nueva_pass
-    echo
-    if [ -z "$nueva_pass" ]; then
-        echo "La contraseña no puede estar vacía."
-        return
-    fi
+    usuario_valido=false
+    while [ "$usuario_valido" = false ]; do
+        read -p "Ingrese nombre de usuario: " nuevo_usuario
+        if [ -z "$nuevo_usuario" ]; then
+            echo "El nombre de usuario no puede estar vacío."
+            continue
+        fi
+        if [[ "$nuevo_usuario" == *:* ]]; then
+            echo "El nombre de usuario no puede contener ':'."
+            continue
+        fi
+
+        if grep -q "^${nuevo_usuario}:" "$usuarios"; then
+            echo "El usuario '$nuevo_usuario' ya existe."
+            continue
+        fi
+        usuario_valido=true
+    done
+    pass_valida=false
+    while [ "$pass_valida" = false ]; do
+        read -s -p "Ingrese contraseña: " nueva_pass
+        echo
+        if [ -z "$nueva_pass" ]; then
+            echo "La contraseña no puede estar vacía."
+            continue
+        fi
+        pass_valida=true
+    done
     echo "${nuevo_usuario}:${nueva_pass}" >> "$usuarios"
     echo "Usuario '$nuevo_usuario' creado correctamente."
 }
 
 cambiar_contrasena() {
     echo "-- Cambiar contraseña --"
-    read -s -p "Ingrese nueva contraseña: " nueva_pass
-    echo
-    if [ -z "$nueva_pass" ]; then
-        echo "La contraseña no puede estar vacía."
-        return
-    fi
+    pass_valida=false
+    while [ "$pass_valida" = false ]; do
+        read -s -p "Ingrese nueva contraseña: " nueva_pass
+        echo
+        if [ -z "$nueva_pass" ]; then
+            echo "La contraseña no puede estar vacía."
+            continue
+        fi
+        pass_valida=true
+    done
+
     tmp=$(mktemp)
     sed "s/^${usuario_logueado}:.*/${usuario_logueado}:${nueva_pass}/" "$usuarios" > "$tmp" \
-      && mv "$tmp" "$usuarios"
+        && mv "$tmp" "$usuarios"
     echo "Contraseña actualizada correctamente para '$usuario_logueado'."
 }
 
@@ -83,13 +99,33 @@ ingresar_producto() {
     tipo_valido=false
     while [ "$tipo_valido" = false ]; do
         read -p "Tipo: " tipo
+
         if [ -z "$tipo" ]; then
             echo "El tipo no puede estar vacío."
-        else
-            tipo_valido=true
+            continue
         fi
-    done
 
+        tipo_normalizado=$(echo "$tipo" | tr '[:upper:]' '[:lower:]')
+
+        es_conocido=false
+        for t in "${tipos_validos[@]}"; do
+            if [ "$tipo_normalizado" = "$t" ]; then
+                es_conocido=true
+                tipo_esperado="$t"
+                break
+            fi
+        done
+
+        if [ "$es_conocido" = false ]; then
+            echo "Tipo inválido."
+            echo "Los tipos válidos son:"
+            printf " - %s\n" "base" "layer" "shade" "dry" "contrast" "technical" "texture" "mediums"
+            continue
+        fi
+        tipo="$tipo_esperado"
+        tipo_valido=true
+    done
+    codigo=$(echo "$tipo" | awk '{print toupper(substr($0,1,3))}')
     modelo_valido=false
     while [ "$modelo_valido" = false ]; do
         read -p "Modelo: " modelo
@@ -129,8 +165,12 @@ ingresar_producto() {
             precio_valido=true
         fi
     done
-    
-    codigo=$(echo "$tipo" | awk '{print toupper(substr($0,1,3))}')
+
+    if grep -q "^${codigo} - ${tipo} - ${modelo} - " "$productos"; then
+        echo "Ya existe un producto con el mismo código, tipo y modelo."
+        return
+    fi
+
     linea="${codigo} - ${tipo} - ${modelo} - ${descripcion} - ${cantidad} - \$ ${precio}"
     echo "$linea" >> "$productos"
     echo "Producto ingresado: $linea"
