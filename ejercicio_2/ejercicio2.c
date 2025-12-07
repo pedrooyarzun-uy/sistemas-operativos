@@ -1,143 +1,136 @@
-#include <pthread.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <pthread.h>
 #include <unistd.h>
+#include <time.h>
 
-#define PASAJEROS 100
-#define OFICINISTAS 5
+#define CANT_PASAJEROS 100
+#define CANT_OFICINISTAS 5
+#define LECTURAS_POR_PASAJERO 4
 #define CAMBIOS_POR_OFICINISTA 3
 
-typedef struct {
-    pthread_mutex_t mutex;
-    pthread_cond_t puede_leer;
-    pthread_cond_t puede_escribir;
-    int lectores_activos;
-    int escritores_esperando;
-    bool escritor_activo;
-} bloqueo_cartel_t;
+/* Variables globales para el control de lectores-escritores */
+int lectores_actuales = 0;
+int escritor_activo = 0;
+int escritores_esperando = 0;
 
+pthread_mutex_t mutex_control;
+pthread_cond_t cond_sin_escritor;
+
+/* Estructura para pasar el identificador numérico a cada hilo */
 typedef struct {
     int id;
-    bloqueo_cartel_t *bloqueo;
-} datos_hilo_t;
+} hilo_info_t;
 
-static void bloqueo_cartel_inicializar(bloqueo_cartel_t *bloqueo) {
-    pthread_mutex_init(&bloqueo->mutex, NULL);
-    pthread_cond_init(&bloqueo->puede_leer, NULL);
-    pthread_cond_init(&bloqueo->puede_escribir, NULL);
-    bloqueo->lectores_activos = 0;
-    bloqueo->escritores_esperando = 0;
-    bloqueo->escritor_activo = false;
-}
-
-static void bloqueo_cartel_destruir(bloqueo_cartel_t *bloqueo) {
-    pthread_mutex_destroy(&bloqueo->mutex);
-    pthread_cond_destroy(&bloqueo->puede_leer);
-    pthread_cond_destroy(&bloqueo->puede_escribir);
-}
-
-static void comenzar_lectura(bloqueo_cartel_t *bloqueo) {
-    pthread_mutex_lock(&bloqueo->mutex);
-    while (bloqueo->escritor_activo || bloqueo->escritores_esperando > 0) {
-        pthread_cond_wait(&bloqueo->puede_leer, &bloqueo->mutex);
+/* Simula una espera aleatoria en segundos dentro de un rango cerrado */
+static void esperar_aleatorio(int maximo) {
+    if (maximo <= 0) {
+        return;
     }
-    bloqueo->lectores_activos++;
-    pthread_mutex_unlock(&bloqueo->mutex);
+    int segundos = rand() % (maximo + 1);
+    sleep(segundos);
 }
 
-static void finalizar_lectura(bloqueo_cartel_t *bloqueo) {
-    pthread_mutex_lock(&bloqueo->mutex);
-    bloqueo->lectores_activos--;
-    if (bloqueo->lectores_activos == 0) {
-        pthread_cond_signal(&bloqueo->puede_escribir);
+/* Protocolo de entrada para lectores con prioridad a escritores */
+static void inicio_lectura(void) {
+    pthread_mutex_lock(&mutex_control);
+    while (escritor_activo || escritores_esperando > 0) {
+        pthread_cond_wait(&cond_sin_escritor, &mutex_control);
     }
-    pthread_mutex_unlock(&bloqueo->mutex);
+    lectores_actuales++;
+    pthread_mutex_unlock(&mutex_control);
 }
 
-static void comenzar_escritura(bloqueo_cartel_t *bloqueo) {
-    pthread_mutex_lock(&bloqueo->mutex);
-    bloqueo->escritores_esperando++;
-    while (bloqueo->escritor_activo || bloqueo->lectores_activos > 0) {
-        pthread_cond_wait(&bloqueo->puede_escribir, &bloqueo->mutex);
+/* Finalización de una lectura */
+static void fin_lectura(void) {
+    pthread_mutex_lock(&mutex_control);
+    lectores_actuales--;
+    if (lectores_actuales == 0) {
+        pthread_cond_broadcast(&cond_sin_escritor);
     }
-    bloqueo->escritores_esperando--;
-    bloqueo->escritor_activo = true;
-    pthread_mutex_unlock(&bloqueo->mutex);
+    pthread_mutex_unlock(&mutex_control);
 }
 
-static void finalizar_escritura(bloqueo_cartel_t *bloqueo) {
-    pthread_mutex_lock(&bloqueo->mutex);
-    bloqueo->escritor_activo = false;
-    if (bloqueo->escritores_esperando > 0) {
-        pthread_cond_signal(&bloqueo->puede_escribir);
-    } else {
-        pthread_cond_broadcast(&bloqueo->puede_leer);
+/* Protocolo de entrada para escritores */
+static void inicio_escritura(void) {
+    pthread_mutex_lock(&mutex_control);
+    escritores_esperando++;
+    while (escritor_activo || lectores_actuales > 0) {
+        pthread_cond_wait(&cond_sin_escritor, &mutex_control);
     }
-    pthread_mutex_unlock(&bloqueo->mutex);
+    escritores_esperando--;
+    escritor_activo = 1;
+    pthread_mutex_unlock(&mutex_control);
 }
 
-static int demora_aleatoria(int max_segundos) {
-    return (rand() % max_segundos) + 1;
+/* Finalización de una escritura */
+static void fin_escritura(void) {
+    pthread_mutex_lock(&mutex_control);
+    escritor_activo = 0;
+    pthread_cond_broadcast(&cond_sin_escritor);
+    pthread_mutex_unlock(&mutex_control);
 }
 
-static void *rutina_pasajero(void *arg) {
-    datos_hilo_t *datos = (datos_hilo_t *)arg;
-    comenzar_lectura(datos->bloqueo);
-    printf("Pasajero %d esta mirando el cartel\n", datos->id);
-    fflush(stdout);
-    sleep(demora_aleatoria(3));
-    finalizar_lectura(datos->bloqueo);
+/* Función ejecutada por cada pasajero */
+void *rutina_pasajero(void *arg) {
+    hilo_info_t *info = (hilo_info_t *)arg;
+    for (int i = 0; i < LECTURAS_POR_PASAJERO; i++) {
+        esperar_aleatorio(3);
+        inicio_lectura();
+        printf("Pasajero %d está mirando el cartel\n", info->id);
+        fflush(stdout);
+        esperar_aleatorio(3);
+        fin_lectura();
+    }
     return NULL;
 }
 
-static void *rutina_oficinista(void *arg) {
-    datos_hilo_t *datos = (datos_hilo_t *)arg;
-    for (int cambio = 0; cambio < CAMBIOS_POR_OFICINISTA; cambio++) {
-        comenzar_escritura(datos->bloqueo);
-        printf("Oficinista %d esta modificando el cartel (cambio %d)\n",
-               datos->id, cambio + 1);
+/* Función ejecutada por cada oficinista */
+void *rutina_oficinista(void *arg) {
+    hilo_info_t *info = (hilo_info_t *)arg;
+    for (int i = 0; i < CAMBIOS_POR_OFICINISTA; i++) {
+        esperar_aleatorio(5);
+        inicio_escritura();
+        printf("Oficinista %d está modificando el cartel\n", info->id);
         fflush(stdout);
-        sleep(demora_aleatoria(5));
-        finalizar_escritura(datos->bloqueo);
-        sleep(demora_aleatoria(5));
+        esperar_aleatorio(5);
+        fin_escritura();
     }
     return NULL;
 }
 
 int main(void) {
-    bloqueo_cartel_t bloqueo;
-    bloqueo_cartel_inicializar(&bloqueo);
-    srand((unsigned int)time(NULL));
+    pthread_t pasajeros[CANT_PASAJEROS];
+    pthread_t oficinistas[CANT_OFICINISTAS];
+    hilo_info_t info_pasajeros[CANT_PASAJEROS];
+    hilo_info_t info_oficinistas[CANT_OFICINISTAS];
 
-    pthread_t hilos_pasajeros[PASAJEROS];
-    pthread_t hilos_oficinistas[OFICINISTAS];
-    datos_hilo_t datos_pasajeros[PASAJEROS];
-    datos_hilo_t datos_oficinistas[OFICINISTAS];
+    srand(time(NULL));
+    pthread_mutex_init(&mutex_control, NULL);
+    pthread_cond_init(&cond_sin_escritor, NULL);
 
-    for (int i = 0; i < PASAJEROS; i++) {
-        datos_pasajeros[i].id = i + 1;
-        datos_pasajeros[i].bloqueo = &bloqueo;
-        pthread_create(&hilos_pasajeros[i], NULL, rutina_pasajero,
-                       &datos_pasajeros[i]);
+    /* Creación de hilos de pasajeros con su número identificatorio */
+    for (int i = 0; i < CANT_PASAJEROS; i++) {
+        info_pasajeros[i].id = i + 1;
+        pthread_create(&pasajeros[i], NULL, rutina_pasajero, &info_pasajeros[i]);
     }
 
-    for (int i = 0; i < OFICINISTAS; i++) {
-        datos_oficinistas[i].id = i + 1;
-        datos_oficinistas[i].bloqueo = &bloqueo;
-        pthread_create(&hilos_oficinistas[i], NULL, rutina_oficinista,
-                       &datos_oficinistas[i]);
+    /* Creación de hilos de oficinistas con su número identificatorio */
+    for (int i = 0; i < CANT_OFICINISTAS; i++) {
+        info_oficinistas[i].id = i + 1;
+        pthread_create(&oficinistas[i], NULL, rutina_oficinista, &info_oficinistas[i]);
     }
 
-    for (int i = 0; i < PASAJEROS; i++) {
-        pthread_join(hilos_pasajeros[i], NULL);
+    for (int i = 0; i < CANT_PASAJEROS; i++) {
+        pthread_join(pasajeros[i], NULL);
     }
 
-    for (int i = 0; i < OFICINISTAS; i++) {
-        pthread_join(hilos_oficinistas[i], NULL);
+    for (int i = 0; i < CANT_OFICINISTAS; i++) {
+        pthread_join(oficinistas[i], NULL);
     }
 
-    bloqueo_cartel_destruir(&bloqueo);
+    pthread_mutex_destroy(&mutex_control);
+    pthread_cond_destroy(&cond_sin_escritor);
+
     return 0;
 }
